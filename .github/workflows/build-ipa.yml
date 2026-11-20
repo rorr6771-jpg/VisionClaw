@@ -14,25 +14,32 @@ jobs:
       - name: Seleccionar Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Crear archivo Secrets.swift con tu API Key
+      - name: Configurar Secrets.swift automáticamente
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          cd samples/CameraAccess/CameraAccess
-          cp Secrets.swift.example Secrets.swift
+          EXAMPLE_FILE=$(find . -name "Secrets.swift.example" | head -n 1)
+          echo "Plantilla encontrada en: $EXAMPLE_FILE"
+          cat "$EXAMPLE_FILE"
+          TARGET_FILE="${EXAMPLE_FILE%.example}"
+          cp "$EXAMPLE_FILE" "$TARGET_FILE"
           python3 -c '
-          import os, re
+          import os, re, sys
           key = os.environ["GEMINI_KEY"]
-          with open("Secrets.swift", "r") as f:
+          target = sys.argv[1]
+          with open(target, "r") as f:
               content = f.read()
-          content = re.sub(r"(geminiAPIKey\s*=\s*\")[^\"]*(\")", r"\g<1>" + key + r"\g<2>", content)
-          with open("Secrets.swift", "w") as f:
+          content = re.sub(r"(?i)(gemini[^=]*=\s*\")[^\"]*(\")", r"\g<1>" + key + r"\g<2>", content)
+          with open(target, "w") as f:
               f.write(content)
-          '
+          ' "$TARGET_FILE"
 
       - name: Compilar la app para iPhone sin firma
         run: |
-          cd samples/CameraAccess
+          PROJ_PATH=$(find . -name "CameraAccess.xcodeproj" | head -n 1)
+          PROJ_DIR=$(dirname "$PROJ_PATH")
+          echo "Compilando proyecto en: $PROJ_DIR"
+          cd "$PROJ_DIR"
           xcodebuild \
             -project CameraAccess.xcodeproj \
             -scheme CameraAccess \
@@ -41,12 +48,13 @@ jobs:
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO | tee build.log || (grep -E "error:|fatal:" build.log | tail -n 20; exit 1)
 
       - name: Empaquetar en archivo .ipa
         run: |
           mkdir -p Payload
-          cp -r samples/CameraAccess/build/Build/Products/Release-iphoneos/*.app Payload/
+          APP_PATH=$(find . -path "*/Release-iphoneos/*.app" | head -n 1)
+          cp -r "$APP_PATH" Payload/
           zip -r VisionClaw.ipa Payload
 
       - name: Subir VisionClaw.ipa para descargar
