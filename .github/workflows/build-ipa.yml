@@ -33,35 +33,26 @@ jobs:
               f.write(content)
           ' "$TARGET_FILE"
 
-      - name: Parchear LiveKitSession.swift y verificar líneas
+      - name: Parchear LiveKitSession.swift y mostrar líneas
         run: |
           python3 -c '
           import pathlib
 
           targets = list(pathlib.Path(".").rglob("LiveKitSession.swift"))
-          print("Archivos LiveKitSession.swift encontrados:", [str(t) for t in targets])
-
-          replacements = [
-              ("track = LocalVideoTrack.createBufferTrack(", "track = await LocalVideoTrack.createBufferTrack("),
-              ("track = LocalVideoTrack.createCameraTrack(", "track = await LocalVideoTrack.createCameraTrack("),
-              ("let track = LocalVideoTrack.createBufferTrack(", "let track = await LocalVideoTrack.createBufferTrack("),
-              ("let track = LocalVideoTrack.createCameraTrack(", "let track = await LocalVideoTrack.createCameraTrack("),
-          ]
+          print("Archivos encontrados:", [str(t) for t in targets])
 
           for p in targets:
-              raw = p.read_text(encoding="utf-8", errors="replace")
-              updated = raw
-              for old, new in replacements:
-                  updated = updated.replace(old, new)
-              if updated != raw:
-                  p.write_text(updated, encoding="utf-8")
-                  print("Se aplicaron cambios en:", p)
-              else:
-                  print("NO se aplicaron cambios en:", p)
-                  lines = raw.splitlines()
-                  for idx in [235, 236, 238, 239, 384, 385]:
-                      if 0 <= idx < len(lines):
-                          print(f"  Línea {idx+1}: {lines[idx]}")
+              text = p.read_text(encoding="utf-8", errors="replace")
+              new_text = text.replace("LocalVideoTrack.createBufferTrack(", "await LocalVideoTrack.createBufferTrack(")
+              new_text = new_text.replace("LocalVideoTrack.createCameraTrack(", "await LocalVideoTrack.createCameraTrack(")
+              new_text = new_text.replace("await await ", "await ")
+              p.write_text(new_text, encoding="utf-8")
+
+              lines = new_text.splitlines()
+              print(f"--- Líneas clave en {p} ---")
+              for idx in list(range(233, 243)) + list(range(382, 390)):
+                  if 0 <= idx < len(lines):
+                      print(f"{idx+1}: {lines[idx]}")
           '
 
       - name: Compilar la app para iPhone sin firma
@@ -77,6 +68,7 @@ jobs:
             -sdk iphoneos \
             -derivedDataPath build \
             SWIFT_VERSION=5.0 \
+            SWIFT_STRICT_CONCURRENCY=minimal \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
