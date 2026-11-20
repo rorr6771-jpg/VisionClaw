@@ -20,7 +20,6 @@ jobs:
         run: |
           EXAMPLE_FILE=$(find . -name "Secrets.swift.example" | head -n 1)
           echo "Plantilla encontrada en: $EXAMPLE_FILE"
-          cat "$EXAMPLE_FILE"
           TARGET_FILE="${EXAMPLE_FILE%.example}"
           cp "$EXAMPLE_FILE" "$TARGET_FILE"
           python3 -c '
@@ -37,15 +36,24 @@ jobs:
       - name: Corregir llamadas await faltantes en LiveKitSession.swift
         run: |
           python3 -c '
-          import glob, re
-          files = glob.glob("**/LiveKitSession.swift", recursive=True)
-          for path in files:
-              with open(path, "r") as f:
-                  text = f.read()
-              text = re.sub(r"(?m)^(\s*(?:let\s+\w+\s*=\s*|\w+\s*=\s*))(?!await\s+)(LocalVideoTrack\.create(?:Buffer|Camera)Track\()", r"\1await \2", text)
-              with open(path, "w") as f:
-                  f.write(text)
-              print("Parcheado:", path)
+          import pathlib, re
+
+          for p in pathlib.Path(".").rglob("LiveKitSession.swift"):
+              lines = p.read_text(encoding="utf-8").splitlines(keepends=True)
+              changed = False
+              new_lines = []
+              for line in lines:
+                  if "LocalVideoTrack.create" in line and "await " not in line:
+                      line = re.sub(
+                          r"(\bLocalVideoTrack\.create(?:Buffer|Camera)Track\s*\()",
+                          r"await \1",
+                          line,
+                      )
+                      changed = True
+                  new_lines.append(line)
+              if changed:
+                  p.write_text("".join(new_lines), encoding="utf-8")
+                  print("Parcheado correctamente:", p)
           '
 
       - name: Compilar la app para iPhone sin firma
@@ -60,6 +68,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
+            SWIFT_VERSION=5.0 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
