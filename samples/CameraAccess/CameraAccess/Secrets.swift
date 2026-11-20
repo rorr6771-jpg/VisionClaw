@@ -1,0 +1,26 @@
+// Copy this file to Secrets.swift and fill in your values.
+// Secrets.swift is gitignored and will not be committed.
+
+import Foundation
+
+enum Secrets {
+  // REQUIRED: Get your key at https://aistudio.google.com/apikey
+  static let geminiAPIKey = "AQ.Ab8RN6KyRGZAY5QcD4S5SirLyvNIWhp-7WEGLsOOLCxdNu9rTA"
+
+  // Hosted action agent (the default backend). Nothing to install: the gateway
+  // runs in the cloud and reaches your connected apps through your own vault.
+  // Point this at your own deployment -- see gateway/README.md. Leave the
+  // token empty: it is per-person identity, entered in the app on first launch
+  // (baking one in would make every install the same user).
+  static let cloudGatewayURL = "https://api.visionagents.app"
+  static let cloudGatewayToken = ""
+
+  // OPTIONAL: self-hosted OpenClaw gateway, for running the agent on your own
+  // machine instead. Switch to it under Settings -> Action Agent.
+  // Use your Mac's Bonjour hostname (run: scutil --get LocalHostName)
+  static let openClawHost = "http://YOUR_MAC_HOSTNAME.local"
+  static let openClawPort = 18789
+  static let openClawHookToken = "YOUR_OPENCLAW_HOOK_TOKEN"
+  static let openClawGatewayToken = "YOUR_OPENCLAW_GATEWAY_TOKEN"
+
+}
