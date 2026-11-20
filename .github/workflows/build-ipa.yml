@@ -1,90 +1,22 @@
-name: Compilar VisionClaw IPA
-
-on:
-  workflow_dispatch:
-
+name: Build IPA sin firmar
+on: workflow_dispatch
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
-      - name: Descargar el código del proyecto
-        uses: actions/checkout@v4
-
-      - name: Seleccionar Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-
-      - name: Configurar Secrets.swift automáticamente
-        env:
-          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - uses: actions/checkout@v4
+      - name: Compilar
         run: |
-          EXAMPLE_FILE=$(find . -name "Secrets.swift.example" | head -n 1)
-          echo "Plantilla encontrada en: $EXAMPLE_FILE"
-          TARGET_FILE="${EXAMPLE_FILE%.example}"
-          cp "$EXAMPLE_FILE" "$TARGET_FILE"
-          python3 -c '
-          import os, re, sys
-          key = os.environ["GEMINI_KEY"]
-          target = sys.argv[1]
-          with open(target, "r") as f:
-              content = f.read()
-          content = re.sub(r"(?i)(gemini[^=]*=\s*\")[^\"]*(\")", r"\g<1>" + key + r"\g<2>", content)
-          with open(target, "w") as f:
-              f.write(content)
-          ' "$TARGET_FILE"
-
-      - name: Parchear LiveKitSession.swift con await
-        run: |
-          python3 -c '
-          import pathlib, re
-
-          files = list(pathlib.Path(".").rglob("LiveKitSession.swift"))
-          print("Archivos LiveKitSession.swift encontrados:", len(files))
-
-          for p in files:
-              src = p.read_text(encoding="utf-8", errors="replace")
-              fixed = re.sub(
-                  r"(?<!await\s)(?<!await\s\n)(LocalVideoTrack\.create(?:Buffer|Camera)Track\s*\()",
-                  r"await \1",
-                  src,
-              )
-              fixed = re.sub(r"\bawait\s+await\s+", "await ", fixed)
-              p.write_text(fixed, encoding="utf-8")
-
-              lines = fixed.splitlines()
-              print(f"=== {p} ===")
-              for idx in [235, 238, 384]:
-                  if 0 <= idx < len(lines):
-                      print(f"Línea {idx+1}: {lines[idx]}")
-          '
-
-      - name: Compilar la app para iPhone sin firma
-        run: |
-          PROJ_PATH=$(find . -name "CameraAccess.xcodeproj" | head -n 1)
-          PROJ_DIR=$(dirname "$PROJ_PATH")
-          echo "Compilando proyecto en: $PROJ_DIR"
-          cd "$PROJ_DIR"
-          xcodebuild \
-            -project CameraAccess.xcodeproj \
-            -scheme CameraAccess \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            SWIFT_VERSION=5.0 \
-            SWIFT_STRICT_CONCURRENCY=minimal \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Empaquetar en archivo .ipa
-        run: |
-          mkdir -p Payload
-          APP_PATH=$(find . -path "*/Release-iphoneos/*.app" | head -n 1)
-          cp -r "$APP_PATH" Payload/
-          zip -r VisionClaw.ipa Payload
-
-      - name: Subir VisionClaw.ipa para descargar
-        uses: actions/upload-artifact@v4
+          cd samples/CameraAccess
+          xcodebuild -list -project CameraAccess.xcodeproj
+          xcodebuild -project CameraAccess.xcodeproj -scheme CameraAccess \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r CameraAccess.ipa Payload
+      - uses: actions/upload-artifact@v4
         with:
-          name: VisionClaw-ipa
-          path: VisionClaw.ipa
+          name: CameraAccess-ipa
+          path: samples/CameraAccess/CameraAccess.ipa
