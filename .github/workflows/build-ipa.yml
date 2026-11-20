@@ -33,26 +33,29 @@ jobs:
               f.write(content)
           ' "$TARGET_FILE"
 
-      - name: Parchear LiveKitSession.swift y mostrar líneas
+      - name: Parchear LiveKitSession.swift con await
         run: |
           python3 -c '
-          import pathlib
+          import pathlib, re
 
-          targets = list(pathlib.Path(".").rglob("LiveKitSession.swift"))
-          print("Archivos encontrados:", [str(t) for t in targets])
+          files = list(pathlib.Path(".").rglob("LiveKitSession.swift"))
+          print("Archivos LiveKitSession.swift encontrados:", len(files))
 
-          for p in targets:
-              text = p.read_text(encoding="utf-8", errors="replace")
-              new_text = text.replace("LocalVideoTrack.createBufferTrack(", "await LocalVideoTrack.createBufferTrack(")
-              new_text = new_text.replace("LocalVideoTrack.createCameraTrack(", "await LocalVideoTrack.createCameraTrack(")
-              new_text = new_text.replace("await await ", "await ")
-              p.write_text(new_text, encoding="utf-8")
+          for p in files:
+              src = p.read_text(encoding="utf-8", errors="replace")
+              fixed = re.sub(
+                  r"(?<!await\s)(?<!await\s\n)(LocalVideoTrack\.create(?:Buffer|Camera)Track\s*\()",
+                  r"await \1",
+                  src,
+              )
+              fixed = re.sub(r"\bawait\s+await\s+", "await ", fixed)
+              p.write_text(fixed, encoding="utf-8")
 
-              lines = new_text.splitlines()
-              print(f"--- Líneas clave en {p} ---")
-              for idx in list(range(233, 243)) + list(range(382, 390)):
+              lines = fixed.splitlines()
+              print(f"=== {p} ===")
+              for idx in [235, 238, 384]:
                   if 0 <= idx < len(lines):
-                      print(f"{idx+1}: {lines[idx]}")
+                      print(f"Línea {idx+1}: {lines[idx]}")
           '
 
       - name: Compilar la app para iPhone sin firma
