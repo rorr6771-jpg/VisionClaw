@@ -33,27 +33,35 @@ jobs:
               f.write(content)
           ' "$TARGET_FILE"
 
-      - name: Corregir llamadas await faltantes en LiveKitSession.swift
+      - name: Parchear LiveKitSession.swift y verificar líneas
         run: |
           python3 -c '
-          import pathlib, re
+          import pathlib
 
-          for p in pathlib.Path(".").rglob("LiveKitSession.swift"):
-              lines = p.read_text(encoding="utf-8").splitlines(keepends=True)
-              changed = False
-              new_lines = []
-              for line in lines:
-                  if "LocalVideoTrack.create" in line and "await " not in line:
-                      line = re.sub(
-                          r"(\bLocalVideoTrack\.create(?:Buffer|Camera)Track\s*\()",
-                          r"await \1",
-                          line,
-                      )
-                      changed = True
-                  new_lines.append(line)
-              if changed:
-                  p.write_text("".join(new_lines), encoding="utf-8")
-                  print("Parcheado correctamente:", p)
+          targets = list(pathlib.Path(".").rglob("LiveKitSession.swift"))
+          print("Archivos LiveKitSession.swift encontrados:", [str(t) for t in targets])
+
+          replacements = [
+              ("track = LocalVideoTrack.createBufferTrack(", "track = await LocalVideoTrack.createBufferTrack("),
+              ("track = LocalVideoTrack.createCameraTrack(", "track = await LocalVideoTrack.createCameraTrack("),
+              ("let track = LocalVideoTrack.createBufferTrack(", "let track = await LocalVideoTrack.createBufferTrack("),
+              ("let track = LocalVideoTrack.createCameraTrack(", "let track = await LocalVideoTrack.createCameraTrack("),
+          ]
+
+          for p in targets:
+              raw = p.read_text(encoding="utf-8", errors="replace")
+              updated = raw
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != raw:
+                  p.write_text(updated, encoding="utf-8")
+                  print("Se aplicaron cambios en:", p)
+              else:
+                  print("NO se aplicaron cambios en:", p)
+                  lines = raw.splitlines()
+                  for idx in [235, 236, 238, 239, 384, 385]:
+                      if 0 <= idx < len(lines):
+                          print(f"  Línea {idx+1}: {lines[idx]}")
           '
 
       - name: Compilar la app para iPhone sin firma
