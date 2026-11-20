@@ -34,6 +34,20 @@ jobs:
               f.write(content)
           ' "$TARGET_FILE"
 
+      - name: Corregir llamadas await faltantes en LiveKitSession.swift
+        run: |
+          python3 -c '
+          import glob, re
+          files = glob.glob("**/LiveKitSession.swift", recursive=True)
+          for path in files:
+              with open(path, "r") as f:
+                  text = f.read()
+              text = re.sub(r"(?m)^(\s*(?:let\s+\w+\s*=\s*|\w+\s*=\s*))(?!await\s+)(LocalVideoTrack\.create(?:Buffer|Camera)Track\()", r"\1await \2", text)
+              with open(path, "w") as f:
+                  f.write(text)
+              print("Parcheado:", path)
+          '
+
       - name: Compilar la app para iPhone sin firma
         run: |
           PROJ_PATH=$(find . -name "CameraAccess.xcodeproj" | head -n 1)
@@ -48,7 +62,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO | tee build.log || (grep -E "error:|fatal:" build.log | tail -n 20; exit 1)
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Empaquetar en archivo .ipa
         run: |
